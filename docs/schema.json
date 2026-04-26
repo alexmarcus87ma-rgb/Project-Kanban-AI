@@ -1,0 +1,269 @@
+{
+  "schema_version": "1.0.0",
+  "database": "SQLite",
+  "tables": [
+    {
+      "name": "users",
+      "description": "Application users with authentication details",
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "primary_key": true,
+          "autoincrement": true,
+          "nullable": false
+        },
+        {
+          "name": "username",
+          "type": "TEXT",
+          "nullable": false,
+          "unique": true,
+          "description": "Unique username for login"
+        },
+        {
+          "name": "password_hash",
+          "type": "TEXT",
+          "nullable": false,
+          "description": "Bcrypt hash of password (future use, MVP uses hardcoded creds)"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "name": "boards",
+      "description": "Project boards (one per user in MVP, supports multiple for future)",
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "primary_key": true,
+          "autoincrement": true,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "nullable": false,
+          "foreign_key": {
+            "table": "users",
+            "column": "id"
+          }
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "description": "Board display name"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "name": "columns",
+      "description": "Kanban board columns (e.g., 'To Do', 'In Progress', 'Done')",
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "primary_key": true,
+          "autoincrement": true,
+          "nullable": false
+        },
+        {
+          "name": "board_id",
+          "type": "INTEGER",
+          "nullable": false,
+          "foreign_key": {
+            "table": "boards",
+            "column": "id"
+          }
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "nullable": false,
+          "description": "Column title (e.g., 'Backlog')"
+        },
+        {
+          "name": "position",
+          "type": "INTEGER",
+          "nullable": false,
+          "description": "Display order (0, 1, 2, ...)"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "name": "cards",
+      "description": "Task cards within columns",
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "primary_key": true,
+          "autoincrement": true,
+          "nullable": false
+        },
+        {
+          "name": "column_id",
+          "type": "INTEGER",
+          "nullable": false,
+          "foreign_key": {
+            "table": "columns",
+            "column": "id"
+          }
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "nullable": false,
+          "description": "Card title/name"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "nullable": true,
+          "description": "Card details/notes"
+        },
+        {
+          "name": "position",
+          "type": "INTEGER",
+          "nullable": false,
+          "description": "Display order within column"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    },
+    {
+      "name": "conversation_history",
+      "description": "AI conversation messages per board",
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "primary_key": true,
+          "autoincrement": true,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INTEGER",
+          "nullable": false,
+          "foreign_key": {
+            "table": "users",
+            "column": "id"
+          }
+        },
+        {
+          "name": "board_id",
+          "type": "INTEGER",
+          "nullable": false,
+          "foreign_key": {
+            "table": "boards",
+            "column": "id"
+          }
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "nullable": false,
+          "description": "Message sender: 'user' or 'assistant'"
+        },
+        {
+          "name": "message",
+          "type": "TEXT",
+          "nullable": false,
+          "description": "Full message content"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      ]
+    }
+  ],
+  "indexes": [
+    {
+      "name": "idx_boards_user_id",
+      "table": "boards",
+      "columns": ["user_id"],
+      "unique": false
+    },
+    {
+      "name": "idx_columns_board_id",
+      "table": "columns",
+      "columns": ["board_id"],
+      "unique": false
+    },
+    {
+      "name": "idx_columns_position",
+      "table": "columns",
+      "columns": ["board_id", "position"],
+      "unique": false
+    },
+    {
+      "name": "idx_cards_column_id",
+      "table": "cards",
+      "columns": ["column_id"],
+      "unique": false
+    },
+    {
+      "name": "idx_cards_position",
+      "table": "cards",
+      "columns": ["column_id", "position"],
+      "unique": false
+    },
+    {
+      "name": "idx_conversation_board",
+      "table": "conversation_history",
+      "columns": ["board_id"],
+      "unique": false
+    }
+  ]
+}

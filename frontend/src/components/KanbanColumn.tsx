@@ -27,7 +27,7 @@ export const KanbanColumn = ({
       ref={setNodeRef}
       className={clsx(
         "flex min-h-[520px] flex-col rounded-3xl border border-[var(--stroke)] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow)] transition",
-        isOver && "ring-2 ring-[var(--accent-yellow)]"
+        isOver && "ring-2 ring-[var(--accent-yellow)] bg-yellow-50"
       )}
       data-testid={`column-${column.id}`}
     >
@@ -58,7 +58,12 @@ export const KanbanColumn = ({
           ))}
         </SortableContext>
         {cards.length === 0 && (
-          <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-[var(--stroke)] px-3 py-6 text-center text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">
+          <div className={clsx(
+            "flex flex-1 items-center justify-center rounded-2xl border border-dashed px-3 py-6 text-center text-xs font-semibold uppercase tracking-[0.2em] transition",
+            isOver
+              ? "border-[var(--accent-yellow)] bg-yellow-50 text-[var(--navy-dark)]"
+              : "border-[var(--stroke)] text-[var(--gray-text)]"
+          )}>
             Drop a card here
           </div>
         )}

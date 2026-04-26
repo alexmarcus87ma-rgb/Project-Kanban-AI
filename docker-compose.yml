@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=false
+      - DATABASE_URL=sqlite:///./database.db
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    volumes:
+      - ./backend/main.py:/app/main.py
+      - ./backend/config.py:/app/config.py
+      - ./backend/database.py:/app/database.py
+      - ./backend/routes:/app/routes
+      - ./backend/services:/app/services
+      - ./backend/schemas:/app/schemas
+      - ./backend/models:/app/models
+      - backend_data:/app/data
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  backend_data:
+    driver: local

@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  // Navigate to login first to establish origin
+  await page.goto("/login");
+  // Pre-seed auth session so tests can access the board
+  await page.evaluate(() =>
+    localStorage.setItem("pm_auth_session", "true")
+  );
+});
+
 test("loads the kanban board", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();

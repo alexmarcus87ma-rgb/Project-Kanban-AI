@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
 import { KanbanBoard } from "@/components/KanbanBoard";
 
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
@@ -42,5 +43,25 @@ describe("KanbanBoard", () => {
     await userEvent.click(deleteButton);
 
     expect(within(column).queryByText("New card")).not.toBeInTheDocument();
+  });
+
+  it("renders a Log out button when onLogout prop is provided", () => {
+    const mockOnLogout = vi.fn();
+    render(<KanbanBoard onLogout={mockOnLogout} />);
+    expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
+  });
+
+  it("calls onLogout when Log out button is clicked", async () => {
+    const mockOnLogout = vi.fn();
+    render(<KanbanBoard onLogout={mockOnLogout} />);
+    await userEvent.click(screen.getByRole("button", { name: /log out/i }));
+    expect(mockOnLogout).toHaveBeenCalledOnce();
+  });
+
+  it("does not render Log out button when onLogout prop is omitted", () => {
+    render(<KanbanBoard />);
+    expect(
+      screen.queryByRole("button", { name: /log out/i })
+    ).not.toBeInTheDocument();
   });
 });
