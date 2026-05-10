@@ -7,12 +7,14 @@ services:
       - "8000:8000"
     environment:
       - DEBUG=false
-      - DATABASE_URL=sqlite:///./database.db
+      - DATABASE_URL=sqlite:///./data/database.db
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     volumes:
       - ./backend/main.py:/app/main.py
+      - ./backend/auth.py:/app/auth.py
       - ./backend/config.py:/app/config.py
       - ./backend/database.py:/app/database.py
+      - ./backend/seed.py:/app/seed.py
       - ./backend/routes:/app/routes
       - ./backend/services:/app/services
       - ./backend/schemas:/app/schemas
