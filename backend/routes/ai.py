@@ -339,6 +339,32 @@ def _try_parse_json(candidate: str) -> tuple[str, list[dict]] | None:
     return None
 
 
+def _user_requested_action(message: str) -> bool:
+    """Check if the user's message contains explicit action keywords.
+
+    This is a server-side safety net to prevent the AI from executing
+    board actions when the user is just chatting or asking questions.
+    The AI model sometimes hallucinates actions on simple messages like
+    "Hello" — this function blocks that.
+    """
+    msg = message.lower().strip()
+
+    # Action verbs that indicate the user wants to modify the board
+    action_keywords = [
+        "create", "add", "make", "new",          # create actions
+        "move", "transfer", "shift", "drag",      # move actions
+        "delete", "remove", "drop", "trash",      # delete actions
+        "rename", "change name", "call it",       # rename actions
+        # Romanian equivalents
+        "creeaz", "adaug", "fă", "fa ",           # create (ro)
+        "mută", "muta", "transferă", "transfera", # move (ro)
+        "șterge", "sterge", "elimină", "elimina", # delete (ro)
+        "redenumește", "redenumeste", "schimbă", "schimba numele",  # rename (ro)
+    ]
+
+    return any(kw in msg for kw in action_keywords)
+
+
 @router.delete("/chat/{board_id}/history", status_code=204)
 async def clear_chat_history(
     board_id: int,
@@ -410,6 +436,12 @@ async def chat(
 
     # Parse AI response
     reply_text, actions = _parse_ai_response(raw_reply)
+
+    # SERVER-SIDE GUARD: Only allow actions if user message contains
+    # explicit action keywords. This prevents the AI from hallucinating
+    # actions on greetings or simple questions.
+    if actions and not _user_requested_action(body.message):
+        actions = []
 
     # Execute actions ONLY if AI returned any
     actions_executed = 0

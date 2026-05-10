@@ -215,3 +215,42 @@ def test_parse_ai_response_markdown_fences():
     text, actions = _parse_ai_response(raw)
     assert text == "Hello!"
     assert actions == []
+
+
+# Server-side action guard tests
+
+def test_user_requested_action_create():
+    """Action keywords are detected."""
+    from routes.ai import _user_requested_action
+
+    assert _user_requested_action("Create a card called Test") is True
+    assert _user_requested_action("add a task to backlog") is True
+    assert _user_requested_action("make a new card") is True
+    assert _user_requested_action("delete that card") is True
+    assert _user_requested_action("move it to Done") is True
+    assert _user_requested_action("rename the column") is True
+
+
+def test_user_requested_action_greetings_blocked():
+    """Greetings and questions should NOT trigger actions."""
+    from routes.ai import _user_requested_action
+
+    assert _user_requested_action("Hello") is False
+    assert _user_requested_action("Hi there!") is False
+    assert _user_requested_action("Hey") is False
+    assert _user_requested_action("What's on my board?") is False
+    assert _user_requested_action("Show me my tasks") is False
+    assert _user_requested_action("How are you?") is False
+    assert _user_requested_action("Good morning") is False
+    assert _user_requested_action("What should I work on?") is False
+
+
+def test_user_requested_action_romanian():
+    """Romanian action keywords are detected."""
+    from routes.ai import _user_requested_action
+
+    assert _user_requested_action("Creează un card nou") is True
+    assert _user_requested_action("Șterge cardul ăla") is True
+    assert _user_requested_action("Mută cardul în Done") is True
+    assert _user_requested_action("Salut!") is False
+    assert _user_requested_action("Ce am pe board?") is False
