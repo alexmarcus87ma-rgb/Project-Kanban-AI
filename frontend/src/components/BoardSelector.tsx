@@ -69,14 +69,15 @@ export function BoardSelector({
         <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-xl border border-[var(--stroke)] bg-white shadow-[var(--shadow-lg)]">
           <div className="max-h-60 overflow-y-auto p-1">
             {boards.map((board) => (
-              <button
+              <div
                 key={board.id}
-                type="button"
+                className="group flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-[var(--navy-dark)] transition hover:bg-[var(--surface)] cursor-pointer"
                 onClick={() => {
                   onSelectBoard(board.id)
                   setIsOpen(false)
                 }}
-                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-[var(--navy-dark)] transition hover:bg-[var(--surface)]"
+                role="option"
+                aria-selected={board.id === activeBoardId}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   {board.id === activeBoardId && (
@@ -88,13 +89,13 @@ export function BoardSelector({
                   <button
                     type="button"
                     onClick={(e) => handleDelete(e, board.id)}
-                    className="flex-shrink-0 rounded p-1 text-[var(--gray-light)] opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 [button:hover>&]:opacity-100"
+                    className="flex-shrink-0 rounded p-1 text-[var(--gray-light)] opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
                     title="Delete board"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
-              </button>
+              </div>
             ))}
           </div>
 
