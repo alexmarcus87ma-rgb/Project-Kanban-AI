@@ -25,7 +25,6 @@ async def test_ai(
     body: AITestRequest,
     user_id: int = Depends(verify_token),
 ):
-    """Test the AI service with a simple prompt."""
     if not settings.openrouter_api_key or settings.openrouter_api_key.startswith("${"):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -42,62 +41,94 @@ async def test_ai(
 
 
 # ---------------------------------------------------------------------------
-# Build system prompt with board state + JSON action schema
+# System prompt - intelligent PM agent
 # ---------------------------------------------------------------------------
 
 def _build_system_prompt(board) -> str:
-    """Build a system prompt that describes the board and the JSON action format."""
-    # Build board state description
     board_state_lines = []
+    total_cards = 0
     for col in sorted(board.columns, key=lambda c: c.position):
         cards_info = []
         for card in sorted(col.cards, key=lambda c: c.position):
-            cards_info.append(f"id={card.id} \"{card.title}\"")
-        cards_str = ", ".join(cards_info) if cards_info else "empty"
-        board_state_lines.append(
-            f"  - Column \"{col.name}\" (id={col.id}): [{cards_str}]"
-        )
+            card_desc = f'    - [id={card.id}] "{card.title}"'
+            if card.description:
+                card_desc += f" — {card.description[:80]}"
+            if card.priority:
+                card_desc += f" (priority: {card.priority})"
+            if card.due_date:
+                card_desc += f" (due: {card.due_date.strftime('%Y-%m-%d')})"
+            cards_info.append(card_desc)
+            total_cards += 1
+        if cards_info:
+            board_state_lines.append(f'  Column "{col.name}" (id={col.id}) — {len(cards_info)} cards:')
+            board_state_lines.extend(cards_info)
+        else:
+            board_state_lines.append(f'  Column "{col.name}" (id={col.id}) — empty')
     board_state = "\n".join(board_state_lines)
 
-    return f"""You are a Kanban board AI assistant. You MUST respond ONLY with a JSON object. No other text.
+    return f"""You are a friendly and helpful personal Project Management assistant. Your name is Kanban AI.
 
-BOARD "{board.name}":
+You are helping the user manage their Kanban board called "{board.name}".
+
+## Your personality
+- Be warm, polite, and conversational — like a helpful colleague
+- When the user says hello or asks general questions, respond naturally and conversationally
+- Proactively describe what you see on their board when relevant
+- Offer suggestions about workflow and project organization when appropriate
+- Always respond in the same language the user writes in
+
+## Current board state
+Board: "{board.name}" — {len(board.columns)} columns, {total_cards} cards total
+
 {board_state}
 
-OUTPUT FORMAT - You must ALWAYS return exactly this JSON structure:
-{{"response":"your message","actions":[]}}
+## What you can do
+You can help the user by:
+1. **Talking about their project** — explain what cards they have, what's in progress, what's done, suggest next steps
+2. **Answering questions** — about their board, workflow, project management best practices
+3. **Taking actions on the board** — but ONLY when the user explicitly asks you to create, move, delete cards or rename columns
 
-ACTION TYPES for the "actions" array:
-- {{"type":"create_card","column_name":"col","title":"name","description":""}}
-- {{"type":"move_card","card_id":ID,"column_name":"destination col"}}
-- {{"type":"delete_card","card_id":ID}}
-- {{"type":"rename_column","column_id":ID,"name":"new name"}}
+## CRITICAL RULES about actions
+- **DO NOT** take any board actions unless the user EXPLICITLY asks you to create/move/delete a card or rename a column
+- A greeting like "Hello" or "Hi" should NEVER trigger any action
+- Questions like "What do I have?" or "Show me my board" should NEVER trigger any action
+- Only act when the user says things like: "create a card called X", "move X to Done", "delete the card X", "rename column X to Y"
+- When in doubt, ASK the user what they want instead of taking action
 
-EXAMPLE - user says "move Build dashboard to Done":
-{{"response":"Done! I moved Build dashboard to the Done column.","actions":[{{"type":"move_card","card_id":9,"column_name":"Done"}}]}}
+## Response format
+You MUST respond with a JSON object in this exact format:
+{{"response": "your conversational message here", "actions": []}}
 
-EXAMPLE - user says "what cards do I have?":
-{{"response":"You have 13 cards across 5 columns...","actions":[]}}
+The "actions" array must be EMPTY unless the user explicitly requested a board action.
 
-EXAMPLE - user says "create a card called API docs in Backlog":
-{{"response":"Created API docs in Backlog!","actions":[{{"type":"create_card","column_name":"Backlog","title":"API docs","description":""}}]}}
+When the user explicitly requests an action, use these action types:
+- {{"type": "create_card", "column_name": "column", "title": "card title", "description": "optional description"}}
+- {{"type": "move_card", "card_id": ID, "column_name": "destination column"}}
+- {{"type": "delete_card", "card_id": ID}}
+- {{"type": "rename_column", "column_id": ID, "name": "new name"}}
 
-RULES:
-- Use card "id" values from the board state above for move/delete.
-- Use column names (partial match OK) for column_name.
-- Respond in the same language as the user.
-- If a card/column doesn't exist, say so in "response" with empty actions.
-- CRITICAL: Output ONLY the JSON object. No markdown. No backticks. No explanation outside the JSON."""
+## Examples
+
+User: "Hello!"
+{{"response": "Hi there! 👋 Welcome to your board \\"{board.name}\\". You currently have {total_cards} cards across {len(board.columns)} columns. How can I help you today?", "actions": []}}
+
+User: "What's on my board?"
+{{"response": "Here's a summary of your board...(describe columns and cards)...", "actions": []}}
+
+User: "Create a card called 'Fix login bug' in the Backlog column"
+{{"response": "Done! I've created the card 'Fix login bug' in your Backlog column.", "actions": [{{"type": "create_card", "column_name": "Backlog", "title": "Fix login bug", "description": ""}}]}}
+
+User: "What should I work on next?"
+{{"response": "Looking at your board, I'd suggest...(give project advice based on board state)...", "actions": []}}
+
+IMPORTANT: Output ONLY the JSON object. No markdown fences. No text before or after the JSON."""
 
 
 def _find_column_by_name(board, name: str):
-    """Find a column by partial name match (case-insensitive)."""
     name_lower = name.lower().strip()
-    # Try exact match first
     for col in board.columns:
         if col.name.lower() == name_lower:
             return col
-    # Then partial match
     for col in board.columns:
         if name_lower in col.name.lower():
             return col
@@ -109,10 +140,6 @@ def _find_column_by_name(board, name: str):
 # ---------------------------------------------------------------------------
 
 def _execute_ai_actions(actions: list[dict], board, user_id: int, db: Session) -> tuple[int, list[str]]:
-    """
-    Execute the actions that the AI decided on.
-    Returns (actions_count, list of execution notes).
-    """
     executed = 0
     notes = []
 
@@ -233,10 +260,6 @@ def _execute_ai_actions(actions: list[dict], board, user_id: int, db: Session) -
 
 
 def _parse_ai_response(raw_text: str) -> tuple[str, list[dict]]:
-    """
-    Parse the AI's JSON response into (text_reply, actions_list).
-    Handles markdown fences, multiple JSON objects, and messy output.
-    """
     text = raw_text.strip()
 
     # Strip markdown code fences if present
@@ -253,8 +276,7 @@ def _parse_ai_response(raw_text: str) -> tuple[str, list[dict]]:
     except json.JSONDecodeError:
         pass
 
-    # Strategy 2: Find ALL JSON objects with "response" key, take the first valid one with actions
-    # Use a bracket-matching approach to extract JSON objects
+    # Strategy 2: Find JSON objects with bracket matching
     best_response = ""
     best_actions: list[dict] = []
 
@@ -285,13 +307,11 @@ def _parse_ai_response(raw_text: str) -> tuple[str, list[dict]]:
     if best_response:
         return best_response, best_actions
 
-    # Fallback: treat entire text as response with no actions
+    # Fallback: treat entire text as conversational response with no actions
     return raw_text.strip(), []
 
 
 def _try_parse_json(candidate: str) -> tuple[str, list[dict]] | None:
-    """Try to parse a JSON candidate, with auto-repair for common AI mistakes."""
-    # Try as-is first
     try:
         data = json.loads(candidate)
         if isinstance(data, dict) and "response" in data:
@@ -302,15 +322,10 @@ def _try_parse_json(candidate: str) -> tuple[str, list[dict]] | None:
 
     # Common AI JSON mistakes - try to fix them
     fixed = candidate
-    # Fix escaped underscores (markdown leak): move\_card -> move_card
     fixed = fixed.replace("\\_", "_")
-    # Fix missing colon after "actions" -> "actions":
     fixed = re.sub(r'"actions\s*\[', '"actions":[', fixed)
-    # Fix missing quotes around keys
     fixed = re.sub(r'(\{|,)\s*(\w+)\s*:', r'\1"\2":', fixed)
-    # Fix trailing commas before } or ]
     fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
-    # Fix single quotes used instead of double quotes
     fixed = re.sub(r"'(\w+)':", r'"\1":', fixed)
 
     try:
@@ -330,13 +345,6 @@ async def chat(
     user_id: int = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    """
-    AI-powered chat endpoint:
-    1. Sends the user message + board state to AI (OpenRouter)
-    2. AI decides what to respond AND what board actions to take
-    3. Backend executes the AI-decided actions
-    4. Returns AI response + update status to frontend
-    """
     if not settings.openrouter_api_key or settings.openrouter_api_key.startswith("${"):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -364,14 +372,13 @@ async def chat(
         .all()
     )
 
-    # Build messages for AI - system prompt includes board state + JSON schema
+    # Build messages for AI
     messages = [
         {"role": "system", "content": _build_system_prompt(board)},
         *[{"role": h.role, "content": h.message} for h in history],
         {"role": "user", "content": body.message},
     ]
 
-    # Send everything to AI
     try:
         raw_reply = await call_openrouter(messages)
     except HTTPStatusError as e:
@@ -381,13 +388,12 @@ async def chat(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI error: {str(e)}")
 
-    # Parse AI structured response
+    # Parse AI response
     reply_text, actions = _parse_ai_response(raw_reply)
 
-    # Execute any actions the AI decided on
+    # Execute actions ONLY if AI returned any
     actions_executed = 0
     if actions:
-        # Re-fetch board to get fresh state before executing
         db.expire_all()
         board = (
             db.query(Board)
@@ -397,9 +403,8 @@ async def chat(
         )
         actions_executed, exec_notes = _execute_ai_actions(actions, board, user_id, db)
 
-    # Fallback if AI returned empty response text
     if not reply_text:
-        reply_text = raw_reply.strip() if raw_reply.strip() else "Done."
+        reply_text = raw_reply.strip() if raw_reply.strip() else "I'm here to help! What would you like to do with your board?"
 
     # Save conversation history
     db.add(ConversationHistory(
