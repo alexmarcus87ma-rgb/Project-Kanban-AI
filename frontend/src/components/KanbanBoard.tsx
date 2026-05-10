@@ -15,6 +15,7 @@ import { KanbanColumn } from "@/components/KanbanColumn"
 import { KanbanCardPreview } from "@/components/KanbanCardPreview"
 import { ChatSidebar } from "@/components/ChatSidebar"
 import { BoardSelector } from "@/components/BoardSelector"
+import { CardDetailModal } from "@/components/CardDetailModal"
 import { moveCard, type BoardData, type Card, type Column, type CardLabel } from "@/lib/kanban"
 import { api } from "@/lib/api"
 import {
@@ -23,6 +24,7 @@ import {
   LogOut,
   Loader2,
   X,
+  Search,
 } from "lucide-react"
 
 interface KanbanBoardProps {
@@ -113,6 +115,9 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
   const [activeCardId, setActiveCardId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [chatOpen, setChatOpen] = useState(false)
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [boardLabels, setBoardLabels] = useState<RawLabel[]>([])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -140,6 +145,7 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
       const { data } = transformBoard(raw)
       setBoard(data)
       setBoardId(targetId)
+      setBoardLabels(raw.labels ?? [])
     } catch (e) {
       console.error("Failed to load board:", e)
     }
@@ -158,6 +164,7 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
         const { boardId: bid, data } = transformBoard(raw)
         setBoardId(bid)
         setBoard(data)
+        setBoardLabels(raw.labels ?? [])
         setLoading(false)
       })
       .catch(() => {
@@ -333,6 +340,46 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
     }
   }
 
+  const handleCardClick = (card: Card) => {
+    setSelectedCard(card)
+  }
+
+  const handleCardSave = async (cardId: string, updates: {
+    title?: string
+    description?: string
+    priority?: string | null
+    due_date?: string | null
+    label_ids?: number[]
+  }) => {
+    await api.updateCard(parseInt(cardId), updates)
+    if (boardId) await loadBoard()
+  }
+
+  const getColumnNameForCard = (cardId: string): string => {
+    const col = board.columns.find((c) => c.cardIds.includes(cardId))
+    return col?.title ?? "Unknown"
+  }
+
+  // Search filter
+  const filterCards = useCallback((cards: Record<string, Card>) => {
+    if (!searchQuery.trim()) return cards
+    const q = searchQuery.toLowerCase()
+    const filtered: Record<string, Card> = {}
+    for (const [id, card] of Object.entries(cards)) {
+      if (
+        card.title.toLowerCase().includes(q) ||
+        card.details.toLowerCase().includes(q) ||
+        card.labels.some((l) => l.name.toLowerCase().includes(q)) ||
+        (card.priority && card.priority.toLowerCase().includes(q))
+      ) {
+        filtered[id] = card
+      }
+    }
+    return filtered
+  }, [searchQuery])
+
+  const filteredCards = useMemo(() => filterCards(board.cards), [filterCards, board.cards])
+
   const activeCard = activeCardId ? cardsById[activeCardId] : null
   const totalCards = Object.keys(board.cards).length
 
@@ -375,6 +422,26 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Search */}
+              <div className="relative hidden sm:block">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--gray-light)]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search cards..."
+                  className="w-40 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] py-2 pl-9 pr-3 text-xs text-[var(--navy-dark)] outline-none transition focus:w-56 focus:border-[var(--primary-blue)] focus:bg-white"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--gray-light)] hover:text-[var(--navy-dark)]"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => setChatOpen((o) => !o)}
                 type="button"
@@ -432,17 +499,26 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
             <section className="grid flex-1 auto-rows-min gap-4" style={{
               gridTemplateColumns: `repeat(${Math.min(board.columns.length, 6)}, minmax(0, 1fr))`
             }}>
-              {board.columns.map((column, index) => (
-                <KanbanColumn
-                  key={column.id}
-                  column={column}
-                  cards={column.cardIds.map((cardId) => board.cards[cardId]).filter(Boolean)}
-                  accentColor={COLUMN_COLORS[index % COLUMN_COLORS.length]}
-                  onRename={handleRenameColumn}
-                  onAddCard={handleAddCard}
-                  onDeleteCard={handleDeleteCard}
-                />
-              ))}
+              {board.columns.map((column, index) => {
+                const visibleCardIds = searchQuery
+                  ? column.cardIds.filter((id) => filteredCards[id])
+                  : column.cardIds
+                const filteredColumn = searchQuery
+                  ? { ...column, cardIds: visibleCardIds }
+                  : column
+                return (
+                  <KanbanColumn
+                    key={column.id}
+                    column={filteredColumn}
+                    cards={visibleCardIds.map((cardId) => board.cards[cardId]).filter(Boolean)}
+                    accentColor={COLUMN_COLORS[index % COLUMN_COLORS.length]}
+                    onRename={handleRenameColumn}
+                    onAddCard={handleAddCard}
+                    onDeleteCard={handleDeleteCard}
+                    onCardClick={handleCardClick}
+                  />
+                )
+              })}
             </section>
             <DragOverlay>
               {activeCard ? (
@@ -460,6 +536,21 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
           isOpen={chatOpen}
           onClose={() => setChatOpen(false)}
           onBoardUpdate={() => loadBoard()}
+        />
+      )}
+
+      {/* Card Detail Modal */}
+      {selectedCard && (
+        <CardDetailModal
+          card={selectedCard}
+          columnName={getColumnNameForCard(selectedCard.id)}
+          boardLabels={boardLabels}
+          onSave={handleCardSave}
+          onDelete={(cardId) => {
+            const col = board.columns.find((c) => c.cardIds.includes(cardId))
+            if (col) handleDeleteCard(col.id, cardId)
+          }}
+          onClose={() => setSelectedCard(null)}
         />
       )}
     </div>

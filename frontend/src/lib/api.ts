@@ -114,4 +114,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ board_id: boardId, message }),
     }),
+
+  clearChatHistory: (boardId: number) =>
+    apiFetch(`/api/ai/chat/${boardId}/history`, { method: "DELETE" }),
 }

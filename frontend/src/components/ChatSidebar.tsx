@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { api } from "@/lib/api"
-import { X, Send, Bot, User, Sparkles } from "lucide-react"
+import { X, Send, Bot, User, Sparkles, RotateCcw } from "lucide-react"
 
 interface ChatSidebarProps {
   boardId: number | null
@@ -107,14 +107,34 @@ export const ChatSidebar = ({
             <p className="text-[11px] text-[var(--gray-text)]">Board Chat</p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          type="button"
-          className="rounded-lg p-1.5 text-[var(--gray-text)] transition hover:bg-[var(--surface)] hover:text-[var(--navy-dark)]"
-          title="Close chat"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {messages.length > 0 && (
+            <button
+              onClick={async () => {
+                if (!boardId) return
+                try {
+                  await api.clearChatHistory(boardId)
+                  setMessages([])
+                } catch {
+                  // ignore
+                }
+              }}
+              type="button"
+              className="rounded-lg p-1.5 text-[var(--gray-text)] transition hover:bg-[var(--surface)] hover:text-[var(--navy-dark)]"
+              title="Clear chat history"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            type="button"
+            className="rounded-lg p-1.5 text-[var(--gray-text)] transition hover:bg-[var(--surface)] hover:text-[var(--navy-dark)]"
+            title="Close chat"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Messages Area */}

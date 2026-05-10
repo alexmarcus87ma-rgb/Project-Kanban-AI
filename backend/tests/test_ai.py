@@ -138,3 +138,80 @@ def test_ai_chat_no_api_key(client, auth_headers, board_id):
             json={"message": "hi", "board_id": board_id}
         )
         assert resp.status_code == 503
+
+
+# Clear chat history tests
+
+def test_clear_chat_history(client, auth_headers, board_id, db):
+    """Test clearing conversation history for a board."""
+    from models import ConversationHistory
+
+    # Add some conversation history
+    db.add(ConversationHistory(user_id=1, board_id=board_id, role="user", message="hello"))
+    db.add(ConversationHistory(user_id=1, board_id=board_id, role="assistant", message="hi"))
+    db.commit()
+
+    # Verify history exists
+    count = db.query(ConversationHistory).filter(ConversationHistory.board_id == board_id).count()
+    assert count == 2
+
+    # Clear history
+    resp = client.delete(f"/api/ai/chat/{board_id}/history", headers=auth_headers)
+    assert resp.status_code == 204
+
+    # Verify history is cleared
+    count = db.query(ConversationHistory).filter(ConversationHistory.board_id == board_id).count()
+    assert count == 0
+
+
+def test_clear_chat_history_no_auth(client, board_id):
+    """Test clearing chat history requires authentication."""
+    resp = client.delete(f"/api/ai/chat/{board_id}/history")
+    assert resp.status_code == 401
+
+
+def test_clear_chat_history_board_not_found(client, auth_headers):
+    """Test clearing chat history for non-existent board."""
+    resp = client.delete("/api/ai/chat/9999/history", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_parse_ai_response_json():
+    """Test AI response parsing with valid JSON."""
+    from routes.ai import _parse_ai_response
+
+    raw = '{"response": "Hello!", "actions": []}'
+    text, actions = _parse_ai_response(raw)
+    assert text == "Hello!"
+    assert actions == []
+
+
+def test_parse_ai_response_with_actions():
+    """Test AI response parsing extracts actions."""
+    from routes.ai import _parse_ai_response
+
+    raw = '{"response": "Done!", "actions": [{"type": "create_card", "column_name": "Backlog", "title": "Test"}]}'
+    text, actions = _parse_ai_response(raw)
+    assert text == "Done!"
+    assert len(actions) == 1
+    assert actions[0]["type"] == "create_card"
+
+
+def test_parse_ai_response_fallback():
+    """Test AI response parsing falls back to raw text."""
+    from routes.ai import _parse_ai_response
+
+    raw = "Just a plain text response"
+    text, actions = _parse_ai_response(raw)
+    assert text == "Just a plain text response"
+    assert actions == []
+
+
+def test_parse_ai_response_markdown_fences():
+    """Test AI response parsing strips markdown fences."""
+    from routes.ai import _parse_ai_response
+
+    raw = '```json\n{"response": "Hello!", "actions": []}\n```'
+    text, actions = _parse_ai_response(raw)
+    assert text == "Hello!"
+    assert actions == []

@@ -339,6 +339,26 @@ def _try_parse_json(candidate: str) -> tuple[str, list[dict]] | None:
     return None
 
 
+@router.delete("/chat/{board_id}/history", status_code=204)
+async def clear_chat_history(
+    board_id: int,
+    user_id: int = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """Clear conversation history for a specific board."""
+    board = db.query(Board).filter(Board.id == board_id, Board.user_id == user_id).first()
+    if not board:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    db.query(ConversationHistory).filter(
+        ConversationHistory.board_id == board_id,
+        ConversationHistory.user_id == user_id,
+    ).delete()
+    db.commit()
+    from fastapi.responses import Response
+    return Response(status_code=204)
+
+
 @router.post("/chat", response_model=AIChatResponse)
 async def chat(
     body: AIChatRequest,

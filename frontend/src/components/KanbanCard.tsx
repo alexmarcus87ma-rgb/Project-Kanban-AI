@@ -7,6 +7,7 @@ import { Trash2, GripVertical, Clock, AlertTriangle } from "lucide-react";
 type KanbanCardProps = {
   card: Card;
   onDelete: (cardId: string) => void;
+  onClick?: (card: Card) => void;
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
@@ -32,7 +33,7 @@ function isDueOverdue(dateStr: string): boolean {
   return new Date(dateStr) < new Date();
 }
 
-export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
+export const KanbanCard = ({ card, onDelete, onClick }: KanbanCardProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
 
@@ -55,6 +56,12 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
       )}
       {...attributes}
       {...listeners}
+      onClick={(e) => {
+        if (!isDragging && onClick) {
+          e.stopPropagation();
+          onClick(card);
+        }
+      }}
       data-testid={`card-${card.id}`}
     >
       {/* Labels */}
