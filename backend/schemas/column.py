@@ -3,6 +3,10 @@ from pydantic import BaseModel
 from .card import CardResponse
 
 
+class ColumnCreate(BaseModel):
+    name: str
+
+
 class ColumnUpdate(BaseModel):
     name: str
 

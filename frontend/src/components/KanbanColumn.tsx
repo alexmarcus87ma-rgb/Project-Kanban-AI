@@ -4,7 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import type { Card, Column } from "@/lib/kanban";
 import { KanbanCard } from "@/components/KanbanCard";
 import { NewCardForm } from "@/components/NewCardForm";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
 
 type KanbanColumnProps = {
   column: Column;
@@ -13,6 +13,7 @@ type KanbanColumnProps = {
   onRename: (columnId: string, title: string) => void;
   onAddCard: (columnId: string, title: string, details: string) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
+  onDeleteColumn?: (columnId: string) => void;
   onCardClick?: (card: Card) => void;
 };
 
@@ -23,6 +24,7 @@ export const KanbanColumn = ({
   onRename,
   onAddCard,
   onDeleteCard,
+  onDeleteColumn,
   onCardClick,
 }: KanbanColumnProps) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
@@ -39,7 +41,7 @@ export const KanbanColumn = ({
       data-testid={`column-${column.id}`}
     >
       {/* Column header */}
-      <div className="flex items-center gap-3 border-b border-[var(--stroke)] px-4 py-3">
+      <div className="group flex items-center gap-3 border-b border-[var(--stroke)] px-4 py-3">
         <span
           className="h-3 w-3 flex-shrink-0 rounded-full"
           style={{ background: accentColor }}
@@ -53,6 +55,16 @@ export const KanbanColumn = ({
         <span className="flex-shrink-0 rounded-md bg-[var(--surface)] px-2 py-0.5 text-xs font-semibold text-[var(--gray-text)]">
           {cards.length}
         </span>
+        {onDeleteColumn && cards.length === 0 && (
+          <button
+            type="button"
+            onClick={() => onDeleteColumn(column.id)}
+            className="flex-shrink-0 rounded-lg p-1 text-[var(--gray-light)] opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+            title="Delete empty column"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Cards list */}

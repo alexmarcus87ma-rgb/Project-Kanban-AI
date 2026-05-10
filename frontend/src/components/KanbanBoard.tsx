@@ -16,6 +16,7 @@ import { KanbanCardPreview } from "@/components/KanbanCardPreview"
 import { ChatSidebar } from "@/components/ChatSidebar"
 import { BoardSelector } from "@/components/BoardSelector"
 import { CardDetailModal } from "@/components/CardDetailModal"
+import { LabelManager } from "@/components/LabelManager"
 import { moveCard, type BoardData, type Card, type Column, type CardLabel } from "@/lib/kanban"
 import { api } from "@/lib/api"
 import {
@@ -25,6 +26,8 @@ import {
   Loader2,
   X,
   Search,
+  Tag,
+  Plus,
 } from "lucide-react"
 
 interface KanbanBoardProps {
@@ -118,6 +121,7 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [boardLabels, setBoardLabels] = useState<RawLabel[]>([])
+  const [labelManagerOpen, setLabelManagerOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -340,6 +344,25 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
     }
   }
 
+  const handleAddColumn = async () => {
+    if (!boardId) return
+    try {
+      await api.createColumn(boardId, "New Column")
+      await loadBoard()
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleDeleteColumn = async (columnId: string) => {
+    try {
+      await api.deleteColumn(parseInt(columnId))
+      await loadBoard()
+    } catch {
+      // ignore
+    }
+  }
+
   const handleCardClick = (card: Card) => {
     setSelectedCard(card)
   }
@@ -472,7 +495,7 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
             </div>
           </header>
 
-          {/* Column tags */}
+          {/* Column tags + actions */}
           <div className="flex flex-wrap items-center gap-2">
             {board.columns.map((column, index) => (
               <div
@@ -487,6 +510,22 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
                 <span className="ml-1 text-[var(--gray-text)]">{column.cardIds.length}</span>
               </div>
             ))}
+            <button
+              type="button"
+              onClick={handleAddColumn}
+              className="flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--stroke)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--gray-text)] transition hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)]"
+            >
+              <Plus className="h-3 w-3" />
+              Column
+            </button>
+            <button
+              type="button"
+              onClick={() => setLabelManagerOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--stroke)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--gray-text)] transition hover:border-[var(--secondary-purple)] hover:text-[var(--secondary-purple)]"
+            >
+              <Tag className="h-3 w-3" />
+              Labels{boardLabels.length > 0 && ` (${boardLabels.length})`}
+            </button>
           </div>
 
           {/* Kanban Grid */}
@@ -515,6 +554,7 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
                     onRename={handleRenameColumn}
                     onAddCard={handleAddCard}
                     onDeleteCard={handleDeleteCard}
+                    onDeleteColumn={handleDeleteColumn}
                     onCardClick={handleCardClick}
                   />
                 )
@@ -536,6 +576,16 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
           isOpen={chatOpen}
           onClose={() => setChatOpen(false)}
           onBoardUpdate={() => loadBoard()}
+        />
+      )}
+
+      {/* Label Manager Modal */}
+      {labelManagerOpen && boardId && (
+        <LabelManager
+          boardId={boardId}
+          labels={boardLabels}
+          onClose={() => setLabelManagerOpen(false)}
+          onUpdate={() => loadBoard()}
         />
       )}
 

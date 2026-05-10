@@ -83,11 +83,20 @@ export const api = {
     apiFetch(`/api/cards/${id}`, { method: "DELETE" }),
 
   // Columns
+  createColumn: (boardId: number, name: string) =>
+    apiFetch(`/api/boards/${boardId}/columns`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
   updateColumn: (id: number, data: object) =>
     apiFetch(`/api/columns/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
+
+  deleteColumn: (id: number) =>
+    apiFetch(`/api/columns/${id}`, { method: "DELETE" }),
 
   // Labels
   getLabels: (boardId: number) =>
