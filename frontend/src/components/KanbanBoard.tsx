@@ -441,6 +441,10 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
                 onSelectBoard={handleSelectBoard}
                 onBoardCreated={handleBoardCreated}
                 onBoardDeleted={handleBoardDeleted}
+                onBoardRenamed={async () => {
+                  await loadBoards()
+                  if (boardId) await loadBoard()
+                }}
               />
             </div>
 

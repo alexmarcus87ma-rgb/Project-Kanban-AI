@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, ChevronDown, Check } from "lucide-react"
+import { Plus, Trash2, ChevronDown, Check, Pencil } from "lucide-react"
 import { api } from "@/lib/api"
 
 interface BoardInfo {
@@ -15,6 +15,7 @@ interface BoardSelectorProps {
   onSelectBoard: (id: number) => void
   onBoardCreated: () => void
   onBoardDeleted: () => void
+  onBoardRenamed?: () => void
 }
 
 export function BoardSelector({
@@ -23,10 +24,13 @@ export function BoardSelector({
   onSelectBoard,
   onBoardCreated,
   onBoardDeleted,
+  onBoardRenamed,
 }: BoardSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [newName, setNewName] = useState("")
+  const [renamingId, setRenamingId] = useState<number | null>(null)
+  const [renameValue, setRenameValue] = useState("")
 
   const activeBoard = boards.find((b) => b.id === activeBoardId)
 
@@ -41,6 +45,26 @@ export function BoardSelector({
     } catch {
       // ignore
     }
+  }
+
+  const handleRename = async (id: number) => {
+    if (!renameValue.trim()) {
+      setRenamingId(null)
+      return
+    }
+    try {
+      await api.updateBoard(id, renameValue.trim())
+      setRenamingId(null)
+      onBoardRenamed?.()
+    } catch {
+      // ignore
+    }
+  }
+
+  const startRename = (e: React.MouseEvent, board: BoardInfo) => {
+    e.stopPropagation()
+    setRenamingId(board.id)
+    setRenameValue(board.name)
   }
 
   const handleDelete = async (e: React.MouseEvent, id: number) => {
@@ -73,28 +97,58 @@ export function BoardSelector({
                 key={board.id}
                 className="group flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-[var(--navy-dark)] transition hover:bg-[var(--surface)] cursor-pointer"
                 onClick={() => {
-                  onSelectBoard(board.id)
-                  setIsOpen(false)
+                  if (renamingId !== board.id) {
+                    onSelectBoard(board.id)
+                    setIsOpen(false)
+                  }
                 }}
                 role="option"
                 aria-selected={board.id === activeBoardId}
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   {board.id === activeBoardId && (
                     <Check className="h-3.5 w-3.5 flex-shrink-0 text-[var(--primary-blue)]" />
                   )}
-                  <span className="truncate">{board.name}</span>
+                  {renamingId === board.id ? (
+                    <input
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRename(board.id)
+                        if (e.key === "Escape") setRenamingId(null)
+                      }}
+                      onBlur={() => handleRename(board.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 rounded border border-[var(--primary-blue)] px-1.5 py-0.5 text-sm outline-none"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="truncate">{board.name}</span>
+                  )}
                 </div>
-                {boards.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleDelete(e, board.id)}
-                    className="flex-shrink-0 rounded p-1 text-[var(--gray-light)] opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-                    title="Delete board"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
+                <div className="flex items-center gap-0.5">
+                  {renamingId !== board.id && (
+                    <button
+                      type="button"
+                      onClick={(e) => startRename(e, board)}
+                      className="flex-shrink-0 rounded p-1 text-[var(--gray-light)] opacity-0 transition hover:bg-[var(--surface)] hover:text-[var(--navy-dark)] group-hover:opacity-100"
+                      title="Rename board"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  )}
+                  {boards.length > 1 && renamingId !== board.id && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDelete(e, board.id)}
+                      className="flex-shrink-0 rounded p-1 text-[var(--gray-light)] opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                      title="Delete board"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
