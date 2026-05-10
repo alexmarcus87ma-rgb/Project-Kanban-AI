@@ -176,8 +176,53 @@ def test_clear_chat_history_board_not_found(client, auth_headers):
     assert resp.status_code == 404
 
 
-def test_parse_ai_response_json():
-    """Test AI response parsing with valid JSON."""
+def test_parse_ai_response_plain_text():
+    """Test AI response parsing with plain text (no actions)."""
+    from routes.ai import _parse_ai_response
+
+    raw = "Hi there! Your board looks great. How can I help?"
+    text, actions = _parse_ai_response(raw)
+    assert text == "Hi there! Your board looks great. How can I help?"
+    assert actions == []
+
+
+def test_parse_ai_response_with_cmd():
+    """Test AI response parsing extracts CMD actions."""
+    from routes.ai import _parse_ai_response
+
+    raw = "Done! I've created the card for you.\nCMD:CREATE|Backlog|Fix Bug|Critical fix needed"
+    text, actions = _parse_ai_response(raw)
+    assert "Done!" in text
+    assert "CMD:" not in text
+    assert len(actions) == 1
+    assert actions[0]["type"] == "create_card"
+    assert actions[0]["column_name"] == "Backlog"
+    assert actions[0]["title"] == "Fix Bug"
+
+
+def test_parse_ai_response_cmd_move():
+    """Test CMD:MOVE parsing."""
+    from routes.ai import _parse_ai_response
+
+    raw = "Moved it!\nCMD:MOVE|42|Done"
+    text, actions = _parse_ai_response(raw)
+    assert actions[0]["type"] == "move_card"
+    assert actions[0]["card_id"] == "42"
+    assert actions[0]["column_name"] == "Done"
+
+
+def test_parse_ai_response_cmd_delete():
+    """Test CMD:DELETE parsing."""
+    from routes.ai import _parse_ai_response
+
+    raw = "Deleted!\nCMD:DELETE|42"
+    text, actions = _parse_ai_response(raw)
+    assert actions[0]["type"] == "delete_card"
+    assert actions[0]["card_id"] == "42"
+
+
+def test_parse_ai_response_legacy_json():
+    """Test AI response parsing still handles legacy JSON format."""
     from routes.ai import _parse_ai_response
 
     raw = '{"response": "Hello!", "actions": []}'
@@ -186,34 +231,13 @@ def test_parse_ai_response_json():
     assert actions == []
 
 
-def test_parse_ai_response_with_actions():
-    """Test AI response parsing extracts actions."""
+def test_parse_ai_response_no_cmd_on_greeting():
+    """Test that greetings produce no actions."""
     from routes.ai import _parse_ai_response
 
-    raw = '{"response": "Done!", "actions": [{"type": "create_card", "column_name": "Backlog", "title": "Test"}]}'
+    raw = "Hi there! Welcome to your board. You have 3 cards."
     text, actions = _parse_ai_response(raw)
-    assert text == "Done!"
-    assert len(actions) == 1
-    assert actions[0]["type"] == "create_card"
-
-
-def test_parse_ai_response_fallback():
-    """Test AI response parsing falls back to raw text."""
-    from routes.ai import _parse_ai_response
-
-    raw = "Just a plain text response"
-    text, actions = _parse_ai_response(raw)
-    assert text == "Just a plain text response"
-    assert actions == []
-
-
-def test_parse_ai_response_markdown_fences():
-    """Test AI response parsing strips markdown fences."""
-    from routes.ai import _parse_ai_response
-
-    raw = '```json\n{"response": "Hello!", "actions": []}\n```'
-    text, actions = _parse_ai_response(raw)
-    assert text == "Hello!"
+    assert text == "Hi there! Welcome to your board. You have 3 cards."
     assert actions == []
 
 

@@ -66,62 +66,45 @@ def _build_system_prompt(board) -> str:
             board_state_lines.append(f'  Column "{col.name}" (id={col.id}) — empty')
     board_state = "\n".join(board_state_lines)
 
-    return f"""You are a friendly and helpful personal Project Management assistant. Your name is Kanban AI.
+    column_names = ", ".join(f'"{col.name}"' for col in sorted(board.columns, key=lambda c: c.position))
 
-You are helping the user manage their Kanban board called "{board.name}".
+    return f"""You are Kanban AI, a friendly personal Project Management assistant.
 
-## Your personality
-- Be warm, polite, and conversational — like a helpful colleague
-- When the user says hello or asks general questions, respond naturally and conversationally
-- Proactively describe what you see on their board when relevant
-- Offer suggestions about workflow and project organization when appropriate
-- Always respond in the same language the user writes in
+You help the user manage their Kanban board called "{board.name}".
 
-## Current board state
+CURRENT BOARD STATE:
 Board: "{board.name}" — {len(board.columns)} columns, {total_cards} cards total
-
 {board_state}
 
-## What you can do
-You can help the user by:
-1. **Talking about their project** — explain what cards they have, what's in progress, what's done, suggest next steps
-2. **Answering questions** — about their board, workflow, project management best practices
-3. **Taking actions on the board** — but ONLY when the user explicitly asks you to create, move, delete cards or rename columns
+Available columns: {column_names}
 
-## CRITICAL RULES about actions
-- **DO NOT** take any board actions unless the user EXPLICITLY asks you to create/move/delete a card or rename a column
-- A greeting like "Hello" or "Hi" should NEVER trigger any action
-- Questions like "What do I have?" or "Show me my board" should NEVER trigger any action
-- Only act when the user says things like: "create a card called X", "move X to Done", "delete the card X", "rename column X to Y"
-- When in doubt, ASK the user what they want instead of taking action
+YOUR BEHAVIOR:
+- Be warm, conversational, helpful — like a friendly colleague
+- Respond in the SAME LANGUAGE the user writes in
+- When greeted, say hi and briefly describe their board
+- When asked about the board, describe what's in each column
+- Suggest what to work on next based on priorities and due dates
+- You can create, move, or delete cards ONLY when the user explicitly asks
 
-## Response format
-You MUST respond with a JSON object in this exact format:
-{{"response": "your conversational message here", "actions": []}}
+WHEN THE USER ASKS YOU TO CREATE/MOVE/DELETE A CARD:
+Include a command line at the END of your response in this exact format:
+CMD:CREATE|column_name|card_title|optional description
+CMD:MOVE|card_id|destination_column_name
+CMD:DELETE|card_id
+CMD:RENAME_COL|column_id|new_name
 
-The "actions" array must be EMPTY unless the user explicitly requested a board action.
+Only include a CMD line if the user EXPLICITLY asked for an action.
+Do NOT include CMD lines for greetings, questions, or general chat.
 
-When the user explicitly requests an action, use these action types:
-- {{"type": "create_card", "column_name": "column", "title": "card title", "description": "optional description"}}
-- {{"type": "move_card", "card_id": ID, "column_name": "destination column"}}
-- {{"type": "delete_card", "card_id": ID}}
-- {{"type": "rename_column", "column_id": ID, "name": "new name"}}
+Example — user says "Create a card Fix Bug in Backlog":
+Your response: "Done! I've created 'Fix Bug' in Backlog for you."
+CMD:CREATE|Backlog|Fix Bug|
 
-## Examples
+Example — user says "Hello":
+Your response: "Hi there! Your board has {total_cards} cards across {len(board.columns)} columns. How can I help?"
+(NO CMD line)
 
-User: "Hello!"
-{{"response": "Hi there! 👋 Welcome to your board \\"{board.name}\\". You currently have {total_cards} cards across {len(board.columns)} columns. How can I help you today?", "actions": []}}
-
-User: "What's on my board?"
-{{"response": "Here's a summary of your board...(describe columns and cards)...", "actions": []}}
-
-User: "Create a card called 'Fix login bug' in the Backlog column"
-{{"response": "Done! I've created the card 'Fix login bug' in your Backlog column.", "actions": [{{"type": "create_card", "column_name": "Backlog", "title": "Fix login bug", "description": ""}}]}}
-
-User: "What should I work on next?"
-{{"response": "Looking at your board, I'd suggest...(give project advice based on board state)...", "actions": []}}
-
-IMPORTANT: Output ONLY the JSON object. No markdown fences. No text before or after the JSON."""
+IMPORTANT: Just respond naturally as text. Do NOT use JSON format. Do NOT wrap your response in code blocks or JSON objects."""
 
 
 def _find_column_by_name(board, name: str):
@@ -260,6 +243,14 @@ def _execute_ai_actions(actions: list[dict], board, user_id: int, db: Session) -
 
 
 def _parse_ai_response(raw_text: str) -> tuple[str, list[dict]]:
+    """Parse AI response to extract conversational text and CMD actions.
+
+    The AI responds in plain text, optionally with CMD: lines at the end.
+    Format: CMD:CREATE|column_name|title|description
+            CMD:MOVE|card_id|column_name
+            CMD:DELETE|card_id
+            CMD:RENAME_COL|column_id|new_name
+    """
     text = raw_text.strip()
 
     # Strip markdown code fences if present
@@ -267,75 +258,72 @@ def _parse_ai_response(raw_text: str) -> tuple[str, list[dict]]:
     text = re.sub(r"\n?```", "", text)
     text = text.strip()
 
-    # Strategy 1: Try to parse the whole thing as JSON
+    # Legacy: if the AI still returns JSON, handle it
     try:
         data = json.loads(text)
         if isinstance(data, dict) and "response" in data:
             actions = data.get("actions", [])
             return data["response"], actions if isinstance(actions, list) else []
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, ValueError):
         pass
 
-    # Strategy 2: Find JSON objects with bracket matching
-    best_response = ""
-    best_actions: list[dict] = []
+    # Parse CMD: lines from the response
+    actions: list[dict] = []
+    response_lines: list[str] = []
 
-    i = 0
-    while i < len(text):
-        if text[i] == '{':
-            depth = 0
-            j = i
-            while j < len(text):
-                if text[j] == '{':
-                    depth += 1
-                elif text[j] == '}':
-                    depth -= 1
-                    if depth == 0:
-                        candidate = text[i:j+1]
-                        parsed = _try_parse_json(candidate)
-                        if parsed:
-                            resp, acts = parsed
-                            if len(acts) > len(best_actions):
-                                best_response = resp
-                                best_actions = acts
-                            elif not best_response:
-                                best_response = resp
-                        break
-                j += 1
-        i += 1
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped.upper().startswith("CMD:"):
+            action = _parse_cmd_line(stripped)
+            if action:
+                actions.append(action)
+        else:
+            response_lines.append(line)
 
-    if best_response:
-        return best_response, best_actions
+    reply = "\n".join(response_lines).strip()
+    if not reply:
+        reply = raw_text.strip()
 
-    # Fallback: treat entire text as conversational response with no actions
-    return raw_text.strip(), []
+    return reply, actions
 
 
-def _try_parse_json(candidate: str) -> tuple[str, list[dict]] | None:
+def _parse_cmd_line(line: str) -> dict | None:
+    """Parse a CMD:ACTION|param1|param2 line into an action dict."""
     try:
-        data = json.loads(candidate)
-        if isinstance(data, dict) and "response" in data:
-            acts = data.get("actions", [])
-            return data["response"], acts if isinstance(acts, list) else []
-    except json.JSONDecodeError:
+        # Remove "CMD:" prefix
+        cmd_part = line[4:].strip()
+        parts = cmd_part.split("|")
+        if not parts:
+            return None
+
+        cmd_type = parts[0].strip().upper()
+
+        if cmd_type == "CREATE" and len(parts) >= 3:
+            return {
+                "type": "create_card",
+                "column_name": parts[1].strip(),
+                "title": parts[2].strip(),
+                "description": parts[3].strip() if len(parts) > 3 else "",
+            }
+        elif cmd_type == "MOVE" and len(parts) >= 3:
+            return {
+                "type": "move_card",
+                "card_id": parts[1].strip(),
+                "column_name": parts[2].strip(),
+            }
+        elif cmd_type == "DELETE" and len(parts) >= 2:
+            return {
+                "type": "delete_card",
+                "card_id": parts[1].strip(),
+            }
+        elif cmd_type == "RENAME_COL" and len(parts) >= 3:
+            return {
+                "type": "rename_column",
+                "column_id": parts[1].strip(),
+                "name": parts[2].strip(),
+            }
+    except (IndexError, ValueError):
         pass
-
-    # Common AI JSON mistakes - try to fix them
-    fixed = candidate
-    fixed = fixed.replace("\\_", "_")
-    fixed = re.sub(r'"actions\s*\[', '"actions":[', fixed)
-    fixed = re.sub(r'(\{|,)\s*(\w+)\s*:', r'\1"\2":', fixed)
-    fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
-    fixed = re.sub(r"'(\w+)':", r'"\1":', fixed)
-
-    try:
-        data = json.loads(fixed)
-        if isinstance(data, dict) and "response" in data:
-            acts = data.get("actions", [])
-            return data["response"], acts if isinstance(acts, list) else []
-    except json.JSONDecodeError:
-        pass
-
     return None
 
 
@@ -407,16 +395,18 @@ async def chat(
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
 
-    # Build conversation history
+    # Build conversation history (limit to last 20 messages to prevent context pollution)
     history = (
         db.query(ConversationHistory)
         .filter(
             ConversationHistory.board_id == body.board_id,
             ConversationHistory.user_id == user_id,
         )
-        .order_by(ConversationHistory.created_at)
+        .order_by(ConversationHistory.created_at.desc())
+        .limit(20)
         .all()
     )
+    history.reverse()  # Back to chronological order
 
     # Build messages for AI
     messages = [
