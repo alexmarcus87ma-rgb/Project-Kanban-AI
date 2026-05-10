@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
@@ -26,7 +26,7 @@ def update_column(
         raise HTTPException(status_code=404, detail="Column not found")
 
     column.name = body.name
-    column.updated_at = datetime.utcnow()
+    column.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(column)
     return column

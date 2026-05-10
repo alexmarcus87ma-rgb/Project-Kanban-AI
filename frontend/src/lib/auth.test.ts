@@ -1,12 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  validateCredentials,
   saveSession,
   clearSession,
   getSession,
-  VALID_USERNAME,
-  VALID_PASSWORD,
-  AUTH_STORAGE_KEY,
+  TOKEN_STORAGE_KEY,
 } from "./auth";
 
 describe("auth", () => {
@@ -14,41 +11,33 @@ describe("auth", () => {
     localStorage.clear();
   });
 
-  describe("validateCredentials", () => {
-    it("returns true for correct username and password", () => {
-      expect(validateCredentials(VALID_USERNAME, VALID_PASSWORD)).toBe(true);
-    });
-
-    it("returns false for wrong username", () => {
-      expect(validateCredentials("wrong", VALID_PASSWORD)).toBe(false);
-    });
-
-    it("returns false for wrong password", () => {
-      expect(validateCredentials(VALID_USERNAME, "wrong")).toBe(false);
-    });
-
-    it("returns false for empty strings", () => {
-      expect(validateCredentials("", "")).toBe(false);
-    });
-  });
-
   describe("saveSession and getSession", () => {
-    it("getSession returns false when nothing stored", () => {
-      expect(getSession()).toBe(false);
+    it("getSession returns null when nothing stored", () => {
+      expect(getSession()).toBe(null);
     });
 
-    it("saveSession then getSession returns true", () => {
-      saveSession();
-      expect(getSession()).toBe(true);
+    it("saveSession stores token and getSession retrieves it", () => {
+      saveSession("test-token-123");
+      expect(getSession()).toBe("test-token-123");
+    });
+
+    it("stores token under the correct key", () => {
+      saveSession("my-token");
+      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe("my-token");
     });
   });
 
   describe("clearSession", () => {
-    it("clearSession after saveSession makes getSession return false", () => {
-      saveSession();
-      expect(getSession()).toBe(true);
+    it("clearSession removes stored token", () => {
+      saveSession("token-to-clear");
+      expect(getSession()).toBe("token-to-clear");
       clearSession();
-      expect(getSession()).toBe(false);
+      expect(getSession()).toBe(null);
+    });
+
+    it("clearSession is safe to call when no session exists", () => {
+      expect(() => clearSession()).not.toThrow();
+      expect(getSession()).toBe(null);
     });
   });
 });

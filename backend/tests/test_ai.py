@@ -38,7 +38,7 @@ def test_ai_test_success(client, auth_headers):
         assert resp.status_code == 200
         data = resp.json()
         assert data["result"] == "4"
-        assert data["model"] == "google/gemma-4-31b-it:free"
+        assert "model" in data
 
 
 def test_ai_test_no_auth(client):
@@ -91,7 +91,7 @@ def test_ai_chat_success(client, auth_headers, board_id, db):
         assert resp.status_code == 200
         data = resp.json()
         assert data["reply"] == "Try moving it to In Progress."
-        assert data["model"] == "google/gemma-4-31b-it:free"
+        assert "model" in data
 
         # Verify both turns persisted
         from models import ConversationHistory

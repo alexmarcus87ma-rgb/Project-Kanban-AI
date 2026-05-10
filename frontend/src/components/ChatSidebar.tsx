@@ -2,16 +2,29 @@
 
 import { useState, useEffect, useRef } from "react"
 import { api } from "@/lib/api"
+import { X, Send, Bot, User, Sparkles } from "lucide-react"
 
 interface ChatSidebarProps {
   boardId: number | null
   isOpen: boolean
   onClose: () => void
+  onBoardUpdate?: () => Promise<void> // Callback to refresh board when AI makes changes
 }
 
-type Message = { id: string; role: "user" | "assistant"; content: string }
+type Message = {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  actionCount?: number // Show if AI executed actions
+  boardUpdated?: boolean
+}
 
-export const ChatSidebar = ({ boardId, isOpen, onClose }: ChatSidebarProps) => {
+export const ChatSidebar = ({
+  boardId,
+  isOpen,
+  onClose,
+  onBoardUpdate,
+}: ChatSidebarProps) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -36,14 +49,30 @@ export const ChatSidebar = ({ boardId, isOpen, onClose }: ChatSidebarProps) => {
 
     try {
       const data = await api.chat(boardId, input)
+
+      // Check if AI made board changes
+      const boardUpdated = data.board_updated || false
+      const actionCount = data.actions_executed || 0
+
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString() + "-ai",
           role: "assistant",
           content: data.reply,
+          actionCount,
+          boardUpdated,
         },
       ])
+
+      // Refresh board if AI made changes
+      if (boardUpdated && onBoardUpdate) {
+        try {
+          await onBoardUpdate()
+        } catch (e) {
+          console.error("Failed to refresh board:", e)
+        }
+      }
     } catch (e: any) {
       setMessages((prev) => [
         ...prev,
@@ -66,71 +95,88 @@ export const ChatSidebar = ({ boardId, isOpen, onClose }: ChatSidebarProps) => {
   }
 
   return (
-    <div className="w-[380px] h-screen sticky top-0 flex flex-col border-l border-[var(--stroke)] bg-white/80 backdrop-blur">
+    <div className="w-[360px] h-screen sticky top-0 flex flex-col border-l border-[var(--stroke)] bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 border-b border-[var(--stroke)] px-6 py-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">
-            AI Assistant
-          </p>
-          <p className="mt-1 truncate text-sm font-semibold text-[var(--navy-dark)]">
-            Board Chat
-          </p>
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--stroke)] px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--secondary-purple)]/10">
+            <Bot className="h-4 w-4 text-[var(--secondary-purple)]" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[var(--navy-dark)]">AI Assistant</p>
+            <p className="text-[11px] text-[var(--gray-text)]">Board Chat</p>
+          </div>
         </div>
         <button
           onClick={onClose}
           type="button"
-          className="flex-shrink-0 rounded-full p-2 transition hover:bg-[var(--surface)]"
+          className="rounded-lg p-1.5 text-[var(--gray-text)] transition hover:bg-[var(--surface)] hover:text-[var(--navy-dark)]"
           title="Close chat"
         >
-          <svg
-            className="h-5 w-5 text-[var(--gray-text)]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          <X className="h-4 w-4" />
         </button>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-center text-sm text-[var(--gray-text)]">
-              Start a conversation with the AI assistant about your board.
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface)]">
+              <Bot className="h-6 w-6 text-[var(--gray-light)]" />
+            </div>
+            <p className="text-sm font-medium text-[var(--gray-text)]">
+              Ask me anything about your board
+            </p>
+            <p className="text-xs text-[var(--gray-light)]">
+              I can help manage tasks, move cards, and answer questions.
             </p>
           </div>
         )}
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
           >
-            <div
-              className={`max-w-xs rounded-2xl px-4 py-3 text-sm ${
-                msg.role === "user"
-                  ? "bg-[var(--primary-blue)] text-white"
-                  : "bg-white border border-[var(--stroke)] text-[var(--navy-dark)] shadow-sm"
-              }`}
-            >
-              <p className="break-words whitespace-pre-wrap">{msg.content}</p>
+            <div className={`flex-shrink-0 mt-1 flex h-6 w-6 items-center justify-center rounded-md ${
+              msg.role === "user"
+                ? "bg-[var(--primary-blue)]/10"
+                : "bg-[var(--secondary-purple)]/10"
+            }`}>
+              {msg.role === "user" ? (
+                <User className="h-3.5 w-3.5 text-[var(--primary-blue)]" />
+              ) : (
+                <Bot className="h-3.5 w-3.5 text-[var(--secondary-purple)]" />
+              )}
+            </div>
+            <div className="flex flex-col max-w-[260px]">
+              <div
+                className={`rounded-xl px-3 py-2.5 text-sm leading-relaxed ${
+                  msg.role === "user"
+                    ? "bg-[var(--primary-blue)] text-white"
+                    : "bg-[var(--surface)] text-[var(--navy-dark)] border border-[var(--stroke)]"
+                }`}
+              >
+                <p className="break-words whitespace-pre-wrap">{msg.content}</p>
+              </div>
+              {msg.boardUpdated && (
+                <div className="mt-1 flex items-center gap-1 text-[10px] font-medium text-[var(--accent-yellow)]">
+                  <Sparkles className="h-3 w-3" />
+                  Board updated ({msg.actionCount} action{msg.actionCount !== 1 ? "s" : ""})
+                </div>
+              )}
             </div>
           </div>
         ))}
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="rounded-2xl px-4 py-3 bg-white border border-[var(--stroke)] shadow-sm">
+          <div className="flex gap-2">
+            <div className="flex-shrink-0 mt-1 flex h-6 w-6 items-center justify-center rounded-md bg-[var(--secondary-purple)]/10">
+              <Bot className="h-3.5 w-3.5 text-[var(--secondary-purple)]" />
+            </div>
+            <div className="rounded-xl px-3 py-2.5 bg-[var(--surface)] border border-[var(--stroke)]">
               <div className="flex gap-1">
-                <div className="h-2 w-2 rounded-full bg-[var(--gray-text)] animate-bounce" />
-                <div className="h-2 w-2 rounded-full bg-[var(--gray-text)] animate-bounce [animation-delay:0.2s]" />
-                <div className="h-2 w-2 rounded-full bg-[var(--gray-text)] animate-bounce [animation-delay:0.4s]" />
+                <div className="h-1.5 w-1.5 rounded-full bg-[var(--gray-light)] animate-bounce" />
+                <div className="h-1.5 w-1.5 rounded-full bg-[var(--gray-light)] animate-bounce [animation-delay:0.2s]" />
+                <div className="h-1.5 w-1.5 rounded-full bg-[var(--gray-light)] animate-bounce [animation-delay:0.4s]" />
               </div>
             </div>
           </div>
@@ -139,24 +185,24 @@ export const ChatSidebar = ({ boardId, isOpen, onClose }: ChatSidebarProps) => {
       </div>
 
       {/* Input Area */}
-      <div className="flex-shrink-0 border-t border-[var(--stroke)] bg-white/50 px-4 py-4">
-        <div className="flex gap-3">
+      <div className="flex-shrink-0 border-t border-[var(--stroke)] p-4">
+        <div className="flex items-end gap-2 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] p-2 transition-colors focus-within:border-[var(--primary-blue)] focus-within:bg-white">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask me anything..."
             disabled={!boardId || isLoading}
-            rows={3}
-            className="flex-1 rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--primary-blue)] disabled:opacity-50"
+            rows={2}
+            className="flex-1 resize-none bg-transparent px-2 py-1 text-sm outline-none placeholder:text-[var(--gray-light)] disabled:opacity-50"
           />
           <button
             onClick={handleSend}
             disabled={!boardId || isLoading || !input.trim()}
             type="button"
-            className="flex-shrink-0 rounded-full bg-[var(--secondary-purple)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+            className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--secondary-purple)] text-white transition hover:opacity-90 disabled:opacity-40"
           >
-            Send
+            <Send className="h-4 w-4" />
           </button>
         </div>
       </div>

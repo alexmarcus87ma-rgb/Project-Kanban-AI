@@ -5,18 +5,17 @@ from database import Base
 from models._util import utcnow
 
 
-class ConversationHistory(Base):
-    __tablename__ = "conversation_history"
+class Label(Base):
+    __tablename__ = "labels"
     __table_args__ = (
-        Index("idx_conversation_board", "board_id"),
+        Index("idx_labels_board_id", "board_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     board_id: Mapped[int] = mapped_column(Integer, ForeignKey("boards.id"), nullable=False)
-    role: Mapped[str] = mapped_column(Text, nullable=False)
-    message: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    color: Mapped[str] = mapped_column(Text, nullable=False, default="#6366f1")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
 
-    user = relationship("User", back_populates="conversation_history")
-    board = relationship("Board", back_populates="conversation_history")
+    board = relationship("Board", back_populates="labels")
+    card_labels = relationship("CardLabel", back_populates="label", cascade="all, delete-orphan")

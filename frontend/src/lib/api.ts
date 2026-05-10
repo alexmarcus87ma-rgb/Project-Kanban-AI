@@ -28,8 +28,15 @@ async function apiFetch(path: string, init?: RequestInit) {
 }
 
 export const api = {
+  // Auth
   login: (username: string, password: string) =>
     apiFetch("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+
+  register: (username: string, password: string) =>
+    apiFetch("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),
@@ -37,10 +44,29 @@ export const api = {
   logout: () =>
     apiFetch("/api/auth/logout", { method: "POST" }),
 
+  getMe: () => apiFetch("/api/auth/me"),
+
+  // Boards
   getBoards: () => apiFetch("/api/boards"),
 
   getBoard: (id: number) => apiFetch(`/api/boards/${id}`),
 
+  createBoard: (name: string) =>
+    apiFetch("/api/boards", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  updateBoard: (id: number, name: string) =>
+    apiFetch(`/api/boards/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+
+  deleteBoard: (id: number) =>
+    apiFetch(`/api/boards/${id}`, { method: "DELETE" }),
+
+  // Cards
   createCard: (boardId: number, data: object) =>
     apiFetch(`/api/boards/${boardId}/cards`, {
       method: "POST",
@@ -56,12 +82,33 @@ export const api = {
   deleteCard: (id: number) =>
     apiFetch(`/api/cards/${id}`, { method: "DELETE" }),
 
+  // Columns
   updateColumn: (id: number, data: object) =>
     apiFetch(`/api/columns/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
 
+  // Labels
+  getLabels: (boardId: number) =>
+    apiFetch(`/api/boards/${boardId}/labels`),
+
+  createLabel: (boardId: number, data: { name: string; color?: string }) =>
+    apiFetch(`/api/boards/${boardId}/labels`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateLabel: (boardId: number, labelId: number, data: { name?: string; color?: string }) =>
+    apiFetch(`/api/boards/${boardId}/labels/${labelId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteLabel: (boardId: number, labelId: number) =>
+    apiFetch(`/api/boards/${boardId}/labels/${labelId}`, { method: "DELETE" }),
+
+  // AI
   chat: (boardId: number, message: string) =>
     apiFetch("/api/ai/chat", {
       method: "POST",

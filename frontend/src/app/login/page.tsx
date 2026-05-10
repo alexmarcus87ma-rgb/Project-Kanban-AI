@@ -6,7 +6,7 @@ import { LoginForm } from "@/components/LoginForm";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, register } = useAuth();
   const router = useRouter();
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -26,7 +26,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--surface)] p-4">
-      <LoginForm onLogin={login} />
+      <LoginForm onLogin={login} onRegister={register} />
     </div>
   );
 }

@@ -20,9 +20,9 @@ def test_update_column_not_found(client, auth_headers):
 def test_column_isolation(client, auth_headers, board_id, db):
     # Create another user + board
     from models import User, Board, KanbanColumn
-    import hashlib
+    from auth import hash_password
 
-    other_user = User(username="other", password_hash=hashlib.sha256(b"pwd").hexdigest())
+    other_user = User(username="other", password_hash=hash_password("pwd"))
     db.add(other_user)
     db.flush()
 

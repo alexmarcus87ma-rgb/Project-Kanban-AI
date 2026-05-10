@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import Integer, Text, DateTime, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
+from models._util import utcnow
 
 
 class KanbanColumn(Base):
@@ -15,8 +16,8 @@ class KanbanColumn(Base):
     board_id: Mapped[int] = mapped_column(Integer, ForeignKey("boards.id"), nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 
     board = relationship("Board", back_populates="columns")
     cards = relationship("Card", back_populates="column", cascade="all, delete-orphan", order_by="Card.position")

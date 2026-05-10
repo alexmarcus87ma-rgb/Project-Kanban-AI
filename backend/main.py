@@ -13,6 +13,7 @@ from routes.auth import router as auth_router
 from routes.boards import router as boards_router
 from routes.cards import router as cards_router
 from routes.columns import router as columns_router
+from routes.labels import router as labels_router
 from routes.ai import router as ai_router
 
 app = FastAPI(title="Project Management API", version="0.1.0")
@@ -38,6 +39,7 @@ app.include_router(auth_router)
 app.include_router(boards_router)
 app.include_router(cards_router)
 app.include_router(columns_router)
+app.include_router(labels_router)
 app.include_router(ai_router)
 
 # Health check endpoint

@@ -13,6 +13,7 @@ import { api } from "@/lib/api"
 interface AuthContextValue {
   isAuthenticated: boolean
   login: (username: string, password: string) => Promise<boolean>
+  register: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
 }
 
@@ -22,7 +23,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    // Read session from localStorage on client mount only
     setIsAuthenticated(!!getSession())
   }, [])
 
@@ -37,6 +37,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const register = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await api.register(username, password)
+      saveSession(response.token)
+      setIsAuthenticated(true)
+      return { success: true }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Registration failed"
+      return { success: false, error: message }
+    }
+  }
+
   const logout = async () => {
     try {
       await api.logout()
@@ -48,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   )
